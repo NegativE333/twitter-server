@@ -1,17 +1,14 @@
 import { Tweet } from "@prisma/client";
 import { prismaClient } from "../../client/db";
 import { GraphqlContext } from "../../interfaces";
+import UserService from "../../services/user";
+import TweetService, { CreateTweetPayload } from "../../services/tweet";
 
-interface CreateTweetPayload{
-    content: string
-    imageURL?: string
-}
+
 
 const queries = {
     getAllTweets: async () => {
-        const allTweets = await prismaClient.tweet.findMany({
-            orderBy: {createdAt: 'desc'}
-        })
+        const allTweets = TweetService.getAllTweets();
         return allTweets;
     }
 }
@@ -24,12 +21,9 @@ const mutations = {
     ) => {
         if(!ctx.user) throw Error("You are not authenticated");
 
-        const tweet = await prismaClient.tweet.create({
-            data: {
-                content: payload.content,
-                imageURL: payload.imageURL,
-                author: {connect: {id : ctx.user.id}}
-            }
+        const tweet = await TweetService.createTweet({
+            ...payload,
+            userId: ctx.user.id
         });
 
         return tweet;
@@ -39,7 +33,7 @@ const mutations = {
 const extraResolvers = {
     Tweet: {
         author: async (parent: Tweet) => {
-            const user = await prismaClient.user.findUnique({where: {id: parent.authorId}})
+            const user = await UserService.getUserById(parent.authorId);
 
             return user;
         }

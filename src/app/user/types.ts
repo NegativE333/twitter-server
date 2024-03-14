@@ -1,4 +1,5 @@
 export const types = `#graphql
+    scalar Date
 
     type User{
         id: ID!
@@ -6,6 +7,7 @@ export const types = `#graphql
         lastName: String
         email: String!
         profileImageURL: String
+        createdAt: Date
 
         tweets: [Tweet]
     }
