@@ -9,6 +9,11 @@ export const types = `#graphql
         profileImageURL: String
         createdAt: Date
 
+        followers: [User]
+        following: [User]
+
+        recommendedUsers: [User]
+
         tweets: [Tweet]
     }
 

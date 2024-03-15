@@ -20,7 +20,7 @@ const queries = {
     },
 
     getUserById: async(parent: any, {id}: {id: string}, ctx: GraphqlContext) => {
-        
+
         const user = UserService.getUserById(id);
         
         return user;
@@ -29,16 +29,80 @@ const queries = {
 
 const extraResolvers = {
     User: {
-        tweets: async (parent: User) => {
-            const tweets = await prismaClient.tweet.findMany({ 
-                where : {
-                    authorId: parent.id
+        tweets: (parent: User) => prismaClient.tweet.findMany({ where: { author: { id: parent.id } } }),
+        followers: async (parent: User) => {
+            const result = await prismaClient.follows.findMany({
+                where: { follwing: { id: parent.id } },
+                include: {
+                    follower: true,
+                },
+            });
+            return result.map((el) => el.follower);
+        },
+        following: async (parent: User) => {
+            const result = await prismaClient.follows.findMany({
+                where: { follower: { id: parent.id } },
+                include: {
+                    follwing: true,
+                },
+            });
+            return result.map((el) => el.follwing);
+        },
+        recommendedUsers: async(parent: User, _: any, ctx: GraphqlContext) => {
+            if(!ctx.user) return [];
+            const myFollowing = await prismaClient.follows.findMany({
+                where: {
+                    follower: { id : ctx.user.id },
+                },
+                include: {
+                    follwing: {
+                        include: {
+                            followers: {
+                                include: {
+                                    follwing: true
+                                }
+                            }
+                        }
+                    }
                 }
-            })
+            });
 
-            return tweets;
-        }
+            const users: User[] = []
+
+            for (const followings of myFollowing){
+                for(const followingOfFollowedUser of followings.follwing.followers){
+                    if(
+                        followingOfFollowedUser.follwing.id !== ctx.user.id &&
+                        myFollowing.findIndex(e => e?.followingId === followingOfFollowedUser.follwing.id) < 0
+                    ){
+                        users.push(followingOfFollowedUser.follwing)
+                    }
+                }
+            }
+            return users;
+        },
     }
 }
 
-export const resolvers = {queries, extraResolvers};
+const mutations = {
+    followUser: async (
+        parent: any, 
+        {to}:{to: string}, 
+        ctx: GraphqlContext
+    ) => {
+        if(!ctx.user || !ctx.user.id) throw new Error('Unauthenticated');
+        await UserService.followUser(ctx.user.id, to);
+        return true;
+    },
+    unfollowUser: async (
+        parent: any, 
+        {to}:{to: string}, 
+        ctx: GraphqlContext
+    ) => {
+        if(!ctx.user || !ctx.user.id) throw new Error('Unauthenticated');
+        await UserService.unFollowUser(ctx.user.id, to);
+        return true;
+    }
+};
+
+export const resolvers = {queries, extraResolvers, mutations};
